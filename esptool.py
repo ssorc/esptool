@@ -66,8 +66,8 @@ class ESPROM:
     def __init__(self, port = 0, baud = ESP_ROM_BAUD):
         self._port = serial.Serial(port, baud)
 
-    """ Read bytes from the serial port while performing SLIP unescaping """
     def read(self, length = 1):
+        """ Read bytes from the serial port while performing SLIP unescaping """
         b = ''
         while len(b) < length:
             c = self._port.read(1)
@@ -83,20 +83,20 @@ class ESPROM:
                 b = b + c
         return b
 
-    """ Write bytes to the serial port while performing SLIP escaping """
     def write(self, packet):
+        """ Write bytes to the serial port while performing SLIP escaping """
         buf = '\xc0'+(packet.replace('\xdb','\xdb\xdd').replace('\xc0','\xdb\xdc'))+'\xc0'
         self._port.write(buf)
 
-    """ Calculate checksum of a blob, as it is defined by the ROM """
     @staticmethod
     def checksum(data, state = ESP_CHECKSUM_MAGIC):
+        """ Calculate checksum of a blob, as it is defined by the ROM """
         for b in data:
             state ^= ord(b)
         return state
 
-    """ Send a request and read the response """
     def command(self, op = None, data = None, chk = 0):
+        """ Send a request and read the response """
         if op:
             # Construct and send request
             pkt = struct.pack('<BBHI', 0x00, op, len(data), chk) + data
@@ -119,14 +119,14 @@ class ESPROM:
 
         return val, body
 
-    """ Perform a connection test """
     def sync(self):
+        """ Perform a connection test """
         self.command(ESPROM.ESP_SYNC, '\x07\x07\x12\x20'+32*'\x55')
         for i in xrange(7):
             self.command()
 
-    """ Try connecting repeatedly until successful, or giving up """
     def connect(self):
+        """ Try connecting repeatedly until successful, or giving up """
         print 'Connecting...'
 
         for _ in xrange(4):
@@ -157,39 +157,39 @@ class ESPROM:
             self._port.open()
         raise Exception('Failed to connect')
 
-    """ Read memory address in target """
     def read_reg(self, addr):
+        """ Read memory address in target """
         res = self.command(ESPROM.ESP_READ_REG, struct.pack('<I', addr))
         if res[1] != "\0\0":
             raise Exception('Failed to read target memory')
         return res[0]
 
-    """ Write to memory address in target """
     def write_reg(self, addr, value, mask, delay_us = 0):
+        """ Write to memory address in target """
         if self.command(ESPROM.ESP_WRITE_REG,
                 struct.pack('<IIII', addr, value, mask, delay_us))[1] != "\0\0":
             raise Exception('Failed to write target memory')
 
-    """ Start downloading an application image to RAM """
     def mem_begin(self, size, blocks, blocksize, offset):
+        """ Start downloading an application image to RAM """
         if self.command(ESPROM.ESP_MEM_BEGIN,
                 struct.pack('<IIII', size, blocks, blocksize, offset))[1] != "\0\0":
             raise Exception('Failed to enter RAM download mode')
 
-    """ Send a block of an image to RAM """
     def mem_block(self, data, seq):
+        """ Send a block of an image to RAM """
         if self.command(ESPROM.ESP_MEM_DATA,
                 struct.pack('<IIII', len(data), seq, 0, 0)+data, ESPROM.checksum(data))[1] != "\0\0":
             raise Exception('Failed to write to target RAM')
 
-    """ Leave download mode and run the application """
     def mem_finish(self, entrypoint = 0):
+        """ Leave download mode and run the application """
         if self.command(ESPROM.ESP_MEM_END,
                 struct.pack('<II', int(entrypoint == 0), entrypoint))[1] != "\0\0":
             raise Exception('Failed to leave RAM download mode')
 
-    """ Start downloading to Flash (performs an erase) """
     def flash_begin(self, size, offset):
+        """ Start downloading to Flash (performs an erase) """
         old_tmo = self._port.timeout
         num_blocks = (size + ESPROM.ESP_FLASH_BLOCK - 1) / ESPROM.ESP_FLASH_BLOCK
         self._port.timeout = 10
@@ -198,26 +198,26 @@ class ESPROM:
             raise Exception('Failed to enter Flash download mode')
         self._port.timeout = old_tmo
 
-    """ Write block to flash """
     def flash_block(self, data, seq):
+        """ Write block to flash """
         if self.command(ESPROM.ESP_FLASH_DATA,
                 struct.pack('<IIII', len(data), seq, 0, 0)+data, ESPROM.checksum(data))[1] != "\0\0":
             raise Exception('Failed to write to target Flash')
 
-    """ Leave flash mode and run/reboot """
     def flash_finish(self, reboot = False):
+        """ Leave flash mode and run/reboot """
         pkt = struct.pack('<I', int(not reboot))
         if self.command(ESPROM.ESP_FLASH_END, pkt)[1] != "\0\0":
             raise Exception('Failed to leave Flash mode')
 
-    """ Run application code in flash """
     def run(self, reboot = False):
+        """ Run application code in flash """
         # Fake flash begin immediately followed by flash end
         self.flash_begin(0, 0)
         self.flash_finish(reboot)
 
-    """ Read MAC from OTP ROM """
     def read_mac(self):
+        """ Read MAC from OTP ROM """
         mac0 = esp.read_reg(esp.ESP_OTP_MAC0)
         mac1 = esp.read_reg(esp.ESP_OTP_MAC1)
         if ((mac1 >> 16) & 0xff) == 0:
@@ -228,8 +228,8 @@ class ESPROM:
             raise Exception("Unknown OUI")
         return oui + ((mac1 >> 8) & 0xff, mac1 & 0xff, (mac0 >> 24) & 0xff)
 
-    """ Read SPI flash manufacturer and device id """
     def flash_id(self):
+        """ Read SPI flash manufacturer and device id """
         self.flash_begin(0, 0)
         self.write_reg(0x60000240, 0x0, 0xffffffff)
         self.write_reg(0x60000200, 0x10000000, 0xffffffff)
@@ -237,8 +237,8 @@ class ESPROM:
         self.flash_finish(False)
         return flash_id
 
-    """ Read SPI flash """
     def flash_read(self, offset, size, count = 1):
+        """ Read SPI flash """
         # Create a custom stub
         stub = struct.pack('<III', offset, size, count) + self.SFLASH_STUB
 
@@ -263,8 +263,8 @@ class ESPROM:
 
         return data
 
-    """ Abuse the loader protocol to force flash to be left in write mode """
     def flash_unlock_dio(self):
+        """ Abuse the loader protocol to force flash to be left in write mode """
         # Enable flash write mode
         self.flash_begin(0, 0)
         # Reset the chip rather than call flash_finish(), which would have
@@ -272,8 +272,8 @@ class ESPROM:
         self.mem_begin(0,0,0,0x40100000)
         self.mem_finish(0x40000080)
 
-    """ Perform a chip erase of SPI flash """
     def flash_erase(self):
+        """ Perform a chip erase of SPI flash """
         # Trick ROM to initialize SFlash
         self.flash_begin(0, 0)
 
@@ -284,7 +284,8 @@ class ESPROM:
         self.mem_finish(0x40004984)
 
         # Yup - there's no good way to detect if we succeeded.
-        # It it on the other hand unlikely to fail.
+        # It is on the other hand unlikely to fail.
+
 
 class ESPFirmwareImage:
     
@@ -394,6 +395,7 @@ class ELFFile:
 
 def arg_auto_int(x):
     return int(x, 0)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description = 'ESP8266 ROM Bootloader Utility', prog = 'esptool')
