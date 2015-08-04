@@ -20,9 +20,17 @@ depending on your platform. (The official pySerial installation instructions are
 
 ## Usage
 
-This utility actually have a user interface! It uses [Argparse](https://docs.python.org/dev/library/argparse.html)
+This utility actually has a user interface! It uses [Argparse](https://docs.python.org/dev/library/argparse.html)
 and is rather self-documenting. Try running `esptool -h`.
-Or hack the script to your hearts content.
+
+To see the additional arguments for each command, type `./esptool <cmd> -h`. For example, to see the optional 
+arguments when writing to flash, such as setting the flash mode or flash size:
+
+```
+./esptool.py write_flash -h
+```
+
+Or hack the script to your heart's content.
 
 ### Ports
 
@@ -77,7 +85,7 @@ esptool uses the RTS and DTR modem status lines to automatically enter the bootl
 Connect RTS to CH_PD (which is used as active-low reset) and DTR to GPIO0.
 
 The bootloader protocol uses [SLIP](http://en.wikipedia.org/wiki/SLIP) framing.
-Each packet begin and end with `0xC0`, all occurrences of `0xC0` and `0xDB` inside the packet
+Each packet begins and ends with `0xC0`, all occurrences of `0xC0` and `0xDB` inside the packet
 are replaced with `0xDB 0xDC` and `0xDB 0xDD`, respectively.
 
 Inside the frame, the packet consists of a header and a variable-length body.
